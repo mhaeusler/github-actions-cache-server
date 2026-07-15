@@ -5,12 +5,14 @@ import { OpenAPIReferencePlugin } from '@orpc/openapi/plugins'
 import { CORSPlugin } from '@orpc/server/plugins'
 import { ZodToJsonSchemaConverter } from '@orpc/zod/zod4'
 import { cacheEntriesRouter } from '~/lib/api/cache-entries'
+import { overviewRouter } from '~/lib/api/overview'
 import { storageLocationsRouter } from '~/lib/api/storage-locations'
 import { env } from '~/lib/env'
 import { logger } from '~/lib/logger'
 
 export const router = {
   cacheEntries: cacheEntriesRouter,
+  overview: overviewRouter,
   storageLocations: storageLocationsRouter,
 }
 

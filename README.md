@@ -31,3 +31,7 @@ volumes:
 ## Documentation
 
 👉 <https://gha-cache-server.falcondev.io/getting-started> 👈
+
+## Management dashboard
+
+Set `MANAGEMENT_API_KEY` to enable the management API and open `/management` on the server. The dashboard accepts that key in the browser session and shows cache entries, storage usage, upload activity, cache hit rate, and the busiest scopes and repositories.

@@ -48,6 +48,20 @@ export async function getCacheScope(event: H3Event) {
     throw createError({ statusCode: 401, message: 'Authorization header missing or malformed' })
 
   const decoded = await verifyGitHubActionsToken(token).catch((err) => {
+    let actualIssuer: string | undefined
+
+    try {
+      actualIssuer = jose.decodeJwt(token).iss
+    } catch {
+      // Keep the original token validation error as the cause below.
+    }
+
+    logger.warn('Token validation failed', {
+      actualIssuer: actualIssuer ?? '<unavailable>',
+      expectedIssuer: env.ACTIONS_TOKEN_ISSUER,
+      error: err,
+    })
+
     throw createError({
       statusCode: 401,
       message: 'Invalid token',
