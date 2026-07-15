@@ -42,6 +42,7 @@ import {
   renewReaderLease,
 } from './storage-leases'
 import { deleteStorageLocationIfUnread, noActiveReaderLease } from './storage-lifecycle'
+import { recordStorageDailyStats } from './storage-stats'
 
 // Bounds the self-heal retry when matching keeps surfacing Dangling Cache
 // Entries for the same prefix — caps a pathological scan (ADR-0005).
@@ -357,6 +358,7 @@ export class Storage {
           .execute()
 
       await tx.deleteFrom('uploads').where('id', '=', upload.id).execute()
+      await recordStorageDailyStats(tx, { addedBytes: sizeBytes })
     })
 
     try {

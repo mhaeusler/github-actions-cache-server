@@ -34,4 +34,4 @@ volumes:
 
 ## Management dashboard
 
-Set `MANAGEMENT_API_KEY` to enable the management API and open `/management` on the server. The dashboard accepts that key in the browser session and shows cache entries, storage usage, upload activity, cache hit rate, and the busiest scopes and repositories.
+Set `MANAGEMENT_API_KEY` to enable the management API and open `/management` on the server. The dashboard accepts that key in the browser session and shows cache entries, current storage, cache hit rate, the busiest repositories, a 30-day chart of added, removed, and total data, and the 20 largest entries with deletion actions.

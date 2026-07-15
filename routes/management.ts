@@ -46,13 +46,16 @@ const page = String.raw`<!doctype html>
         font-weight: 750;
       }
       .button.secondary { color: var(--text); background: var(--panel); }
+      .delete-button { border: 1px solid #71404a; border-radius: 7px; padding: 6px 9px; color: var(--danger); background: transparent; font-size: 12px; }
+      .delete-button:hover { background: #3a1d25; }
+      .delete-button:disabled { cursor: wait; opacity: .6; }
       .button:disabled { cursor: wait; opacity: .6; }
       .status { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 13px; }
       .status::before { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); content: ""; }
       .status.online::before { background: var(--accent-strong); box-shadow: 0 0 12px var(--accent-strong); }
       .status.error::before { background: var(--danger); }
       .grid { display: grid; gap: 16px; }
-      .summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 16px; }
+      .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 16px; }
       .panel { min-width: 0; border: 1px solid var(--line); border-radius: 16px; background: color-mix(in srgb, var(--panel) 92%, transparent); box-shadow: 0 16px 40px #0000001c; }
       .stat { padding: 20px; }
       .stat-label { color: var(--muted); font-size: 13px; }
@@ -74,6 +77,21 @@ const page = String.raw`<!doctype html>
       .metric { padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: #111821; }
       .metric strong { display: block; margin-bottom: 5px; font-size: 18px; }
       .metric span { color: var(--muted); font-size: 11px; }
+      .chart-panel .panel-body { padding-bottom: 14px; }
+      .chart-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 8px; color: var(--muted); font-size: 12px; }
+      .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+      .legend-item::before { width: 9px; height: 9px; border-radius: 2px; background: var(--accent-strong); content: ""; }
+      .legend-item.removed::before { background: var(--danger); }
+      .legend-item.total::before { width: 16px; height: 3px; border-radius: 99px; background: var(--blue); }
+      .chart-wrap { position: relative; min-height: 250px; }
+      .chart-wrap svg { display: block; width: 100%; height: auto; overflow: visible; }
+      .chart-grid line { stroke: var(--line); stroke-width: 1; }
+      .chart-grid text, .chart-labels text { fill: var(--muted); font-size: 10px; }
+      .chart-labels text { text-anchor: middle; }
+      .chart-bars rect.added { fill: var(--accent-strong); opacity: .85; }
+      .chart-bars rect.removed { fill: var(--danger); opacity: .8; }
+      .chart-total { fill: none; stroke: var(--blue); stroke-linecap: round; stroke-linejoin: round; stroke-width: 3; }
+      .chart-total-point { fill: var(--blue); }
       .breakdown { display: grid; gap: 13px; }
       .breakdown-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; }
       .breakdown-name { overflow: hidden; color: var(--text); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
@@ -81,6 +99,9 @@ const page = String.raw`<!doctype html>
       .bar { height: 5px; margin-top: 6px; overflow: hidden; border-radius: 99px; background: #293642; }
       .bar > span { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--blue); }
       .table-panel { overflow: hidden; }
+      .cache-table table { min-width: 1080px; }
+      .cache-table th:first-child, .cache-table td:first-child { min-width: 420px; }
+      .cache-tables { margin-top: 16px; }
       .table-wrap { overflow-x: auto; }
       table { width: 100%; border-collapse: collapse; font-size: 13px; }
       th, td { padding: 13px 20px; border-top: 1px solid var(--line); text-align: left; white-space: nowrap; }
@@ -131,36 +152,37 @@ const page = String.raw`<!doctype html>
 
         <div class="grid summary-grid">
           <article class="panel stat"><div class="stat-label">Cache entries</div><div id="cache-entries" class="stat-value">—</div><div id="cache-entries-detail" class="stat-detail">Finalized entries</div></article>
-          <article class="panel stat"><div class="stat-label">Tracked storage</div><div id="storage-bytes" class="stat-value">—</div><div id="storage-detail" class="stat-detail">Across storage locations</div></article>
+          <article class="panel stat"><div class="stat-label">Current data</div><div id="storage-bytes" class="stat-value">—</div><div id="storage-detail" class="stat-detail">Across storage locations</div></article>
           <article class="panel stat"><div class="stat-label">Cache hit rate</div><div id="hit-rate" class="stat-value accent">—</div><div id="request-detail" class="stat-detail">Since this process started</div></article>
-          <article class="panel stat"><div class="stat-label">Active uploads</div><div id="active-uploads" class="stat-value">—</div><div id="server-detail" class="stat-detail">Server —</div></article>
         </div>
 
         <div class="grid main-grid">
           <div class="stack">
-            <section class="panel">
-              <div class="panel-header"><h2 class="panel-title">Storage health</h2><span id="storage-updated" class="panel-meta">—</span></div>
+            <section class="panel chart-panel">
+              <div class="panel-header"><h2 class="panel-title">Data movement</h2><span class="panel-meta">Last 30 days</span></div>
               <div class="panel-body">
-                <div class="storage-summary"><div><div id="storage-big" class="storage-value">—</div><div class="storage-caption">Recorded payload size</div></div><div id="tracked-percent" class="storage-caption">—% tracked</div></div>
-                <div class="progress" aria-label="Tracked storage locations"><span id="tracked-progress"></span></div>
-                <div class="metric-list" style="margin-top: 16px"><div class="metric"><strong id="location-count">—</strong><span>Storage locations</span></div><div class="metric"><strong id="merged-count">—</strong><span>Merged locations</span></div><div class="metric"><strong id="pending-count">—</strong><span>Pending merges</span></div><div class="metric"><strong id="downloaded-count">—</strong><span>Accessed locations</span></div><div class="metric"><strong id="tracked-count">—</strong><span>Size tracked</span></div><div class="metric"><strong id="upload-count">—</strong><span>Uploads in flight</span></div></div>
+                <div class="chart-legend"><span class="legend-item">Added</span><span class="legend-item removed">Removed</span><span class="legend-item total">Total data</span></div>
+                <div class="chart-wrap">
+                  <svg id="data-chart" viewBox="0 0 760 250" role="img" aria-label="Daily added, removed, and total cache data for the last 30 days"><g id="chart-grid" class="chart-grid"></g><g id="chart-bars" class="chart-bars"></g><polyline id="chart-total" class="chart-total"></polyline><g id="chart-points"></g><g id="chart-labels" class="chart-labels"></g></svg>
+                  <div id="chart-empty" class="empty hidden">No storage history yet</div>
+                </div>
               </div>
-            </section>
-            <section class="panel table-panel">
-              <div class="panel-header"><h2 class="panel-title">Recent cache entries</h2><span class="panel-meta">Latest updates</span></div>
-              <div class="table-wrap"><table><thead><tr><th>Key</th><th>Scope</th><th>Repository</th><th>Size</th><th>Updated</th></tr></thead><tbody id="recent-entries"></tbody></table></div>
-            </section>
-            <section class="panel table-panel">
-              <div class="panel-header"><h2 class="panel-title">Uploads in flight</h2><span class="panel-meta">Newest first</span></div>
-              <div class="table-wrap"><table><thead><tr><th>Key</th><th>Scope</th><th>Parts</th><th>Started</th></tr></thead><tbody id="active-uploads-table"></tbody></table></div>
             </section>
           </div>
 
           <div class="stack">
-            <section class="panel"><div class="panel-header"><h2 class="panel-title">Traffic</h2><span class="panel-meta">Prometheus counters</span></div><div class="panel-body"><div class="metric-list"><div class="metric"><strong id="hits">—</strong><span>Cache hits</span></div><div class="metric"><strong id="misses">—</strong><span>Cache misses</span></div><div class="metric"><strong id="requests">—</strong><span>Total requests</span></div></div></div></section>
-            <section class="panel"><div class="panel-header"><h2 class="panel-title">Top scopes</h2><span class="panel-meta">By entry count</span></div><div id="scopes" class="panel-body breakdown"></div></section>
             <section class="panel"><div class="panel-header"><h2 class="panel-title">Top repositories</h2><span class="panel-meta">By entry count</span></div><div id="repositories" class="panel-body breakdown"></div></section>
           </div>
+        </div>
+        <div class="stack cache-tables">
+          <section class="panel table-panel cache-table">
+            <div class="panel-header"><h2 class="panel-title">Largest cache entries</h2><span class="panel-meta">Top 20 by payload size</span></div>
+            <div class="table-wrap"><table><thead><tr><th>Key</th><th>Repository</th><th>Size</th><th>Updated</th><th>Last accessed</th><th></th></tr></thead><tbody id="largest-entries"></tbody></table></div>
+          </section>
+          <section class="panel table-panel cache-table">
+            <div class="panel-header"><h2 class="panel-title">Recent cache entries</h2><span class="panel-meta">Latest updates</span></div>
+            <div class="table-wrap"><table><thead><tr><th>Key</th><th>Repository</th><th>Size</th><th>Updated</th><th>Last accessed</th></tr></thead><tbody id="recent-entries"></tbody></table></div>
+          </section>
         </div>
       </section>
     </main>
@@ -205,27 +227,38 @@ const page = String.raw`<!doctype html>
         const renderMetrics = (text) => {
           const hits = parseMetric(text, 'cache_requests_total', '{result="hit"}');
           const misses = parseMetric(text, 'cache_requests_total', '{result="miss"}');
-          setText('#hits', formatNumber(hits)); setText('#misses', formatNumber(misses)); setText('#requests', formatNumber(hits + misses));
           setText('#hit-rate', hits + misses ? ((hits / (hits + misses)) * 100).toFixed(1) + '%' : '—');
           setText('#request-detail', formatNumber(hits + misses) + ' total cache requests');
+        };
+        const renderChart = (rows) => {
+          const chart = document.querySelector('#data-chart');
+          const empty = document.querySelector('#chart-empty');
+          const hasData = rows.some((row) => row.addedBytes || row.removedBytes || row.totalBytes);
+          chart.classList.toggle('hidden', !hasData); empty.classList.toggle('hidden', hasData);
+          if (!hasData) return;
+          const width = 760; const height = 250; const margin = { top: 16, right: 48, bottom: 30, left: 50 };
+          const plotWidth = width - margin.left - margin.right; const plotHeight = height - margin.top - margin.bottom;
+          const baseline = margin.top + plotHeight; const step = plotWidth / rows.length; const barWidth = Math.max(2, step * .26);
+          const maxTotal = Math.max(...rows.map((row) => row.totalBytes), 1); const maxFlow = Math.max(...rows.flatMap((row) => [row.addedBytes, row.removedBytes]), 1);
+          const x = (index) => margin.left + step * (index + .5); const totalY = (value) => margin.top + plotHeight * (1 - value / maxTotal); const flowHeight = (value) => plotHeight * value / maxFlow;
+          const grid = [0, .5, 1].map((fraction) => { const y = margin.top + plotHeight * (1 - fraction); return '<line x1="' + margin.left + '" x2="' + (width - margin.right) + '" y1="' + y + '" y2="' + y + '"></line><text x="' + (margin.left - 8) + '" y="' + (y + 3) + '" text-anchor="end">' + formatBytes(maxTotal * fraction) + '</text><text x="' + (width - margin.right + 8) + '" y="' + (y + 3) + '">' + formatBytes(maxFlow * fraction) + '</text>'; }).join('');
+          document.querySelector('#chart-grid').innerHTML = grid;
+          document.querySelector('#chart-bars').innerHTML = rows.map((row, index) => { const center = x(index); const addedHeight = flowHeight(row.addedBytes); const removedHeight = flowHeight(row.removedBytes); return '<rect class="added" x="' + (center - barWidth - 1) + '" y="' + (baseline - addedHeight) + '" width="' + barWidth + '" height="' + addedHeight + '" rx="2"><title>' + escapeHtml(row.day) + ' · Added ' + formatBytes(row.addedBytes) + '</title></rect><rect class="removed" x="' + (center + 1) + '" y="' + (baseline - removedHeight) + '" width="' + barWidth + '" height="' + removedHeight + '" rx="2"><title>' + escapeHtml(row.day) + ' · Removed ' + formatBytes(row.removedBytes) + '</title></rect>'; }).join('');
+          document.querySelector('#chart-total').setAttribute('points', rows.map((row, index) => x(index) + ',' + totalY(row.totalBytes)).join(' '));
+          document.querySelector('#chart-points').innerHTML = rows.map((row, index) => '<circle class="chart-total-point" cx="' + x(index) + '" cy="' + totalY(row.totalBytes) + '" r="2"><title>' + escapeHtml(row.day) + ' · Total ' + formatBytes(row.totalBytes) + '</title></circle>').join('');
+          document.querySelector('#chart-labels').innerHTML = rows.map((row, index) => index % 5 === 0 || index === rows.length - 1 ? '<text x="' + x(index) + '" y="' + (height - 8) + '">' + escapeHtml(new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(row.day + 'T00:00:00Z'))) + '</text>' : '').join('');
         };
         const render = (data) => {
           const storage = data.storage;
           setText('#cache-entries', formatNumber(data.cacheEntries.total));
           setText('#cache-entries-detail', formatNumber(storage.locations) + ' storage locations');
-          setText('#storage-bytes', formatBytes(storage.bytes)); setText('#storage-big', formatBytes(storage.bytes));
-          setText('#storage-detail', formatNumber(storage.sizeTrackedLocations) + ' of ' + formatNumber(storage.locations) + ' locations tracked');
-          setText('#active-uploads', formatNumber(data.uploads.total)); setText('#upload-count', formatNumber(data.uploads.total));
-          setText('#server-detail', data.server.version + ' · ' + data.server.databaseDriver + ' / ' + data.server.storageDriver);
-          setText('#storage-updated', 'Updated ' + formatDate(data.generatedAt));
-          const trackedPercent = storage.locations ? Math.round(storage.sizeTrackedLocations / storage.locations * 100) : 100;
-          setText('#tracked-percent', trackedPercent + '% tracked'); document.querySelector('#tracked-progress').style.width = trackedPercent + '%';
-          setText('#location-count', formatNumber(storage.locations)); setText('#merged-count', formatNumber(storage.mergedLocations)); setText('#pending-count', formatNumber(storage.pendingMerges)); setText('#downloaded-count', formatNumber(storage.downloadedLocations)); setText('#tracked-count', formatNumber(storage.sizeTrackedLocations));
-          renderBreakdown('#scopes', data.topScopes); renderBreakdown('#repositories', data.topRepositories);
+          setText('#storage-bytes', formatBytes(storage.bytes)); setText('#storage-detail', formatNumber(storage.sizeTrackedLocations) + ' of ' + formatNumber(storage.locations) + ' locations tracked');
+          renderChart(data.dailyStats);
+          renderBreakdown('#repositories', data.topRepositories);
+          const largest = document.querySelector('#largest-entries');
+          largest.innerHTML = data.largestEntries.length ? data.largestEntries.map((entry) => '<tr><td title="' + escapeHtml(entry.key) + '">' + escapeHtml(entry.key) + '</td><td>' + escapeHtml(entry.repoId) + '</td><td>' + formatBytes(entry.sizeBytes) + '</td><td class="muted">' + formatDate(entry.updatedAt) + '</td><td class="muted">' + formatDate(entry.lastAccessedAt) + '</td><td><button class="delete-button" type="button" data-entry-id="' + escapeHtml(entry.id) + '">Delete</button></td></tr>').join('') : '<tr><td colspan="6" class="empty">No cache entries yet</td></tr>';
           const recent = document.querySelector('#recent-entries');
-          recent.innerHTML = data.recentEntries.length ? data.recentEntries.map((entry) => '<tr><td title="' + escapeHtml(entry.key) + '">' + escapeHtml(entry.key) + '</td><td>' + escapeHtml(entry.scope) + '</td><td>' + escapeHtml(entry.repoId) + '</td><td>' + formatBytes(entry.sizeBytes) + '</td><td class="muted">' + formatDate(entry.updatedAt) + '</td></tr>').join('') : '<tr><td colspan="5" class="empty">No cache entries yet</td></tr>';
-          const uploads = document.querySelector('#active-uploads-table');
-          uploads.innerHTML = data.activeUploads.length ? data.activeUploads.map((upload) => '<tr><td title="' + escapeHtml(upload.key) + '">' + escapeHtml(upload.key) + '</td><td>' + escapeHtml(upload.scope) + '</td><td>' + formatNumber(upload.finishedPartUploadCount) + ' / ' + formatNumber(upload.startedPartUploadCount) + '</td><td class="muted">' + formatDate(upload.createdAt) + '</td></tr>').join('') : '<tr><td colspan="4" class="empty">No uploads in flight</td></tr>';
+          recent.innerHTML = data.recentEntries.length ? data.recentEntries.map((entry) => '<tr><td title="' + escapeHtml(entry.key) + '">' + escapeHtml(entry.key) + '</td><td>' + escapeHtml(entry.repoId) + '</td><td>' + formatBytes(entry.sizeBytes) + '</td><td class="muted">' + formatDate(entry.updatedAt) + '</td><td class="muted">' + formatDate(entry.lastAccessedAt) + '</td></tr>').join('') : '<tr><td colspan="5" class="empty">No cache entries yet</td></tr>';
         };
         const fetchDashboard = async () => {
           const apiKey = sessionStorage.getItem(keyStorage);
@@ -242,6 +275,18 @@ const page = String.raw`<!doctype html>
             if (error.message && error.message.includes('rejected')) { sessionStorage.removeItem(keyStorage); dashboard.classList.add('hidden'); auth.classList.remove('hidden'); authError.textContent = error.message; authError.classList.remove('hidden'); keyInput.focus(); }
           } finally { refreshButton.disabled = false; }
         };
+        document.querySelector('#largest-entries').addEventListener('click', async (event) => {
+          const button = event.target.closest('.delete-button');
+          if (!button || !confirm('Delete this cache entry?')) return;
+          button.disabled = true;
+          try {
+            const response = await fetch('/management-api/cache-entries/' + encodeURIComponent(button.dataset.entryId), { method: 'DELETE', headers: { 'X-Api-Key': sessionStorage.getItem(keyStorage) } });
+            if (!response.ok) throw new Error('Unable to delete cache entry (HTTP ' + response.status + ').');
+            await fetchDashboard();
+          } catch (error) {
+            notice.textContent = error.message || 'Unable to delete cache entry.'; notice.style.display = 'block';
+          } finally { button.disabled = false; }
+        });
         keyForm.addEventListener('submit', (event) => { event.preventDefault(); sessionStorage.setItem(keyStorage, keyInput.value); auth.classList.add('hidden'); dashboard.classList.remove('hidden'); authError.classList.add('hidden'); fetchDashboard(); });
         refreshButton.addEventListener('click', fetchDashboard);
         document.querySelector('#forget').addEventListener('click', () => { sessionStorage.removeItem(keyStorage); dashboard.classList.add('hidden'); auth.classList.remove('hidden'); keyInput.value = ''; keyInput.focus(); });

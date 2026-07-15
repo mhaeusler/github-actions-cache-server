@@ -4,6 +4,7 @@ import type { StorageAdapter } from './storage'
 import pLimit from 'p-limit'
 import { env } from './env'
 import { logger } from './logger'
+import { recordStorageDailyStats } from './storage-stats'
 
 export interface OrphanedStorageSummary {
   inspectedFolders: number
@@ -94,9 +95,16 @@ export async function deleteStorageLocationIfUnread(
   tx: Transaction<Database>,
   storageLocationId: string,
 ) {
-  if (!(await lockStorageLocation(tx, storageLocationId))) return false
+  let locationQuery = tx
+    .selectFrom('storage_locations')
+    .select(['id', 'sizeBytes'])
+    .where('id', '=', storageLocationId)
+  if (env.DB_DRIVER !== 'sqlite') locationQuery = locationQuery.forUpdate()
+  const location = await locationQuery.executeTakeFirst()
+  if (!location) return false
   if (await hasActiveReaderLease(tx, storageLocationId)) return false
   await tx.deleteFrom('storage_locations').where('id', '=', storageLocationId).execute()
+  await recordStorageDailyStats(tx, { removedBytes: location.sizeBytes ?? 0 })
   return true
 }
 
@@ -161,6 +169,7 @@ export async function reconcileOrphanedStorage({
       limit(async () => {
         try {
           const deleted = await adapter.deleteFolder(folder.folderName)
+          await recordStorageDailyStats(db, { removedBytes: deleted.bytes })
           summary.deletedFolders++
           summary.deletedObjects += deleted.objects
           summary.deletedBytes += deleted.bytes

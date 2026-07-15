@@ -39,6 +39,14 @@ export const storageLocationSchema = z.object({
 })
 export type StorageLocation = z.infer<typeof storageLocationSchema>
 
+export const storageDailyStatSchema = z.object({
+  day: z.string(),
+  addedBytes: z.number(),
+  removedBytes: z.number(),
+  totalBytes: z.number(),
+})
+type StorageDailyStat = z.infer<typeof storageDailyStatSchema>
+
 export const mergeLeaseSchema = z.object({
   storageLocationId: z.string(),
   token: z.string(),
@@ -76,6 +84,7 @@ export interface Database {
   merge_leases: MergeLease
   storage_reader_leases: StorageReaderLease
   storage_locations: StorageLocation
+  storage_daily_stats: StorageDailyStat
   uploads: Upload
 }
 

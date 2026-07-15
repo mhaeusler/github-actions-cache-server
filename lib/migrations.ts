@@ -1,7 +1,9 @@
 import type { Hookable } from 'hookable'
 import type { Migration } from 'kysely/migration'
 import type { Env } from './schemas'
+import { sql } from 'kysely'
 import { Storage } from './storage'
+import { getUtcDay } from './storage-stats'
 
 export function migrations(
   driver: Env['DB_DRIVER'],
@@ -199,6 +201,34 @@ export function migrations(
       },
       async down(db) {
         await db.schema.alterTable('storage_locations').dropColumn('sizeBytes').execute()
+      },
+    },
+    $6_storage_daily_stats: {
+      async up(db) {
+        await db.schema
+          .createTable('storage_daily_stats')
+          .addColumn('day', driver === 'mysql' ? 'varchar(10)' : 'text', (col) => col.primaryKey())
+          .addColumn('addedBytes', 'bigint', (col) => col.notNull().defaultTo(0))
+          .addColumn('removedBytes', 'bigint', (col) => col.notNull().defaultTo(0))
+          .addColumn('totalBytes', 'bigint', (col) => col.notNull().defaultTo(0))
+          .execute()
+
+        const { totalBytes } = await db
+          .selectFrom('storage_locations')
+          .select(sql<number>`coalesce(sum(${sql.ref('sizeBytes')}), 0)`.as('totalBytes'))
+          .executeTakeFirstOrThrow()
+        await db
+          .insertInto('storage_daily_stats')
+          .values({
+            day: getUtcDay(),
+            addedBytes: 0,
+            removedBytes: 0,
+            totalBytes: Number(totalBytes ?? 0),
+          })
+          .execute()
+      },
+      async down(db) {
+        await db.schema.dropTable('storage_daily_stats').execute()
       },
     },
   } satisfies Record<string, Migration>
