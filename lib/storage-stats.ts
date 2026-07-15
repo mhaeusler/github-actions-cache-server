@@ -23,12 +23,18 @@ export async function recordStorageDailyStats(
     totalBytes: Number(current.totalBytes ?? 0),
   }
   const insert = db.insertInto('storage_daily_stats').values(values)
+  const addedBytesRef =
+    env.DB_DRIVER === 'postgres' ? sql.ref('storage_daily_stats.addedBytes') : sql.ref('addedBytes')
+  const removedBytesRef =
+    env.DB_DRIVER === 'postgres'
+      ? sql.ref('storage_daily_stats.removedBytes')
+      : sql.ref('removedBytes')
 
   if (env.DB_DRIVER === 'mysql')
     return insert
       .onDuplicateKeyUpdate({
-        addedBytes: sql<number>`${sql.ref('addedBytes')} + ${addedBytes}`,
-        removedBytes: sql<number>`${sql.ref('removedBytes')} + ${removedBytes}`,
+        addedBytes: sql<number>`${addedBytesRef} + ${addedBytes}`,
+        removedBytes: sql<number>`${removedBytesRef} + ${removedBytes}`,
         totalBytes: values.totalBytes,
       })
       .execute()
@@ -36,8 +42,8 @@ export async function recordStorageDailyStats(
   return insert
     .onConflict((oc) =>
       oc.column('day').doUpdateSet({
-        addedBytes: sql<number>`${sql.ref('addedBytes')} + ${addedBytes}`,
-        removedBytes: sql<number>`${sql.ref('removedBytes')} + ${removedBytes}`,
+        addedBytes: sql<number>`${addedBytesRef} + ${addedBytes}`,
+        removedBytes: sql<number>`${removedBytesRef} + ${removedBytes}`,
         totalBytes: values.totalBytes,
       }),
     )
